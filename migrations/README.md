@@ -1,65 +1,95 @@
 # Database Migrations
 
-This directory contains SQL migration scripts for setting up the exam management system database in Supabase (PostgreSQL).
+This directory contains SQL migration scripts for bootstrapping the Examini
+database (PostgreSQL). After running these, Alembic manages all subsequent
+schema changes.
 
-## Migration Order
+## Migration order
 
-Execute these migrations in the Supabase SQL Editor in the following order:
+Run these in your database's SQL editor (e.g. [Neon](https://neon.tech)
+SQL Editor), **in order**:
 
-1. `01_create_extensions.sql` - Enable required PostgreSQL extensions
-2. `02_create_tables.sql` - Create all database tables
-3. `03_create_indexes.sql` - Create indexes for performance
-4. `04_create_functions_triggers.sql` - Create database functions and triggers
-5. `05_setup_rls_policies.sql` - Enable Row Level Security
-6. `06_seed_initial_data.sql` - Seed initial admin user (optional, can be done after backend setup)
+1. `01_create_extensions.sql` — Enable required PostgreSQL extensions (uuid-ossp)
+2. `02_create_tables.sql` — Create all core tables (users, classes, exams, questions, etc.)
+3. `03_create_indexes.sql` — Create indexes for performance
+4. `04_create_functions_triggers.sql` — Create database functions and triggers (updated_at, etc.)
+5. **Skip `05_setup_rls_policies.sql`** — It uses Supabase-only `auth.uid()`; all access control is enforced in FastAPI regardless
+6. `06_seed_initial_data.sql` — Seed initial admin user (update password hash first — see below)
+7. `07_add_student_profiles_and_roll_numbers.sql` — Student profiles and roll number support
 
-## How to Run Migrations
-
-### Option 1: Using Supabase SQL Editor
-
-1. Go to your Supabase project dashboard
-2. Navigate to SQL Editor
-3. Copy and paste each migration file's content
-4. Execute in order (01 → 02 → 03 → 04 → 05 → 06)
-5. Verify all tables are created successfully
-
-### Option 2: Using psql Command Line
+Then apply Alembic migrations for the AI layer and any later changes:
 
 ```bash
-# Set your database connection string
-export DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
+cd backend
+uv run alembic upgrade head
+```
 
-# Run migrations in order
+Alembic covers migrations `08` onwards (AI tables, assessment workflows,
+agent state, memories, workflow generations, adjusted checkpoints).
+
+## How to run
+
+### Option 1: Neon SQL Editor (recommended)
+
+1. Go to your [Neon](https://neon.tech) project dashboard
+2. Open the SQL Editor
+3. Copy and paste each migration file's content
+4. Execute in order: `01` → `04`, `06`, `07`
+5. Then run `uv run alembic upgrade head` from the `backend/` directory
+
+### Option 2: psql command line
+
+```bash
+export DATABASE_URL="postgresql://user:pass@host/db"
+
 psql $DATABASE_URL -f 01_create_extensions.sql
 psql $DATABASE_URL -f 02_create_tables.sql
 psql $DATABASE_URL -f 03_create_indexes.sql
 psql $DATABASE_URL -f 04_create_functions_triggers.sql
-psql $DATABASE_URL -f 05_setup_rls_policies.sql
-# Skip 06_seed_initial_data.sql until backend is set up to generate proper password hash
+# Skip 05 — Supabase-only RLS
+psql $DATABASE_URL -f 06_seed_initial_data.sql
+psql $DATABASE_URL -f 07_add_student_profiles_and_roll_numbers.sql
+
+cd ..
+uv run alembic upgrade head
 ```
 
-## Important Notes
+## Password hash for the seed admin
 
-- **Password Hash**: The seed script (`06_seed_initial_data.sql`) contains a placeholder password hash. You must generate the actual bcrypt hash using the backend authentication system before running this migration in production.
+`06_seed_initial_data.sql` contains a **placeholder** password hash.
+Generate a real bcrypt hash before using it:
 
-- **RLS Policies**: Row Level Security is enabled, but detailed policies will be managed through the backend application using JWT tokens and role-based access control.
+```bash
+cd backend
+uv run python -c "from app.utils.security import get_password_hash; print(get_password_hash('your-password'))"
+```
 
-- **Backup**: Always backup your database before running migrations in production.
+Update the hash in the SQL file or directly in the database row, then sign
+in as admin.
 
-## Verification
+## Migration inventory
 
-After running all migrations, verify:
-
-1. All tables exist: Check in Supabase Table Editor
-2. Indexes are created: Query `pg_indexes` to verify
-3. Triggers are active: Check triggers on tables
-4. Functions exist: Query `pg_proc` to verify
-5. RLS is enabled: Check table RLS status
+| File | Purpose |
+|---|---|
+| `01_create_extensions.sql` | PostgreSQL extensions (uuid-ossp) |
+| `02_create_tables.sql` | Core tables: users, classes, sections, exams, questions, materials, attempts, etc. |
+| `03_create_indexes.sql` | Performance indexes |
+| `04_create_functions_triggers.sql` | Functions & triggers (updated_at, etc.) |
+| `05_setup_rls_policies.sql` | ~~Supabase RLS policies~~ — **skip** |
+| `06_seed_initial_data.sql` | Initial admin user seed |
+| `07_add_student_profiles_and_roll_numbers.sql` | Student profiles, roll numbers |
+| `08_create_ai_tables.sql` | AI tool/agent registry tables |
+| `09_create_assessment_workflow_tables.sql` | Assessment workflow state |
+| `10_create_agent_state.sql` | Agent execution state |
+| `11_create_ai_memories.sql` | Agent memory persistence |
+| `12_create_workflow_generations.sql` | Workflow generation tracking |
+| `13_allow_adjusted_checkpoints.sql` | Adjusted checkpoint support |
 
 ## Troubleshooting
 
-- If you encounter foreign key errors, ensure tables are created in the correct order
-- If indexes fail, check that tables exist first
-- If RLS blocks queries, use service_role key for initial setup
-- Check Supabase logs for detailed error messages
-
+| Problem | Solution |
+|---|---|
+| Foreign key errors | Ensure tables are created in the correct order (01 → 04) |
+| `A database error occurred` in the app | Run `uv run alembic upgrade head` to apply pending migrations |
+| Special characters break `DATABASE_URL` | Run `uv run python fix_database_url.py` |
+| Index creation fails | Verify that the referenced tables exist first |
