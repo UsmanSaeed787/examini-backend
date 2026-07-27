@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     app_name: str = "Exam Management System"
     app_version: str = "1.0.0"
     debug: bool = True
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,https://examini-indol.vercel.app,*"
     
     # File Upload
     max_file_size_mb: int = 50

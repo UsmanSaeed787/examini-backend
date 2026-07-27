@@ -18,11 +18,15 @@ app = FastAPI(
     debug=settings.debug
 )
 
-# CORS
+# CORS — Allow explicit origins, wildcards, and Vercel preview/production domains
+cors_origins = settings.cors_origins_list
+if "*" not in cors_origins:
+    cors_origins.append("*")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Set to False when allow_origins is wildcard '*' to conform to CORS spec
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
