@@ -8,6 +8,12 @@ Examini enables teachers to upload course materials and let AI plan, generate, a
 
 > **🔗 Full App →** [https://examini-indol.vercel.app](https://examini-indol.vercel.app)
 
+### 🔑 Demo Credentials
+
+| Role | Email | Password |
+|---|---|---|
+| **Admin** | `admin@examini.com` | `Admin@123` |
+
 ---
 
 ## Features
