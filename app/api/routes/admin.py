@@ -6,6 +6,7 @@ from app.database import get_db
 from app.api.deps import get_admin_user, require_role
 from app.models.user import User
 from app.models.class_model import Class, Section
+from app.models.exam import Exam
 from app.services.user_service import UserService
 from app.services.class_service import ClassService
 from app.services.student_service import StudentService
@@ -111,13 +112,14 @@ async def get_dashboard(
     total_teachers = db.query(User).filter(User.role == UserRole.TEACHER.value).count()
     total_students = db.query(User).filter(User.role == UserRole.STUDENT.value).count()
     total_classes = db.query(Class).count()
+    total_exams = db.query(Exam).count()
     
     return DashboardStats(
         total_users=total_users,
         total_teachers=total_teachers,
         total_students=total_students,
         total_classes=total_classes,
-        total_exams=0  # TODO: Add Exam model count
+        total_exams=total_exams
     )
 
 
