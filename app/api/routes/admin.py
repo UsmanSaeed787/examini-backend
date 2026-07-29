@@ -7,6 +7,7 @@ from app.api.deps import get_admin_user, require_role
 from app.models.user import User
 from app.models.class_model import Class, Section
 from app.models.exam import Exam
+from app.schemas.exam import ExamResponse as ExamSchemaResponse
 from app.services.user_service import UserService
 from app.services.class_service import ClassService
 from app.services.student_service import StudentService
@@ -393,4 +394,33 @@ async def get_students_by_class_section(
     """Get all students in a specific class and section."""
     students = StudentService.get_students_by_class_section(db, class_id, section_id)
     return [UserResponse.model_validate(s) for s in students]
+
+
+@router.get("/exams", response_model=PaginatedResponse[ExamSchemaResponse])
+async def list_all_exams(
+    class_id: Optional[UUID] = Query(None),
+    is_published: Optional[bool] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    current_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """List all exams across the platform for administrators."""
+    query = db.query(Exam)
+    if class_id:
+        query = query.filter(Exam.class_id == class_id)
+    if is_published is not None:
+        query = query.filter(Exam.is_published == is_published)
+    
+    total = query.count()
+    exams = query.order_by(Exam.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    
+    return PaginatedResponse(
+        items=[ExamSchemaResponse.model_validate(e) for e in exams],
+        total=total,
+        page=page,
+        limit=limit,
+        pages=(total + limit - 1) // limit if total > 0 else 1
+    )
+
 
